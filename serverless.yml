@@ -1,0 +1,64 @@
+service: web3auth-discord-backend
+frameworkVersion: '3'
+useDotenv: true
+
+package:
+  individually: true
+custom:
+  tableName:
+    dev: UserDev
+    prd: UserPrd
+  esbuild:
+    bundle: true
+    minify: false
+    sourcemap: true
+    exclude: ['aws-sdk']
+    target: 'node18'
+    define: { 'require.resolve': undefined }
+    platform: 'node'
+    concurrency: 10
+    watch:
+      pattern: ['src/**/*.ts']
+      ignore: ['temp/**/*']
+
+provider:
+  name: aws
+  stage: ${opt:stage, 'dev'}
+  region: ap-northeast-1
+  runtime: nodejs18.x
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:DescribeTable
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource: "arn:aws:dynamodb:*:*:table/${self:custom.tableName.${self:provider.stage}}"
+
+functions:
+  api:
+    handler: src/handler.handler
+    timeout: 30
+    environment:
+      NODE_ENV: ${env:NODE_ENV}
+      DISCORD_CLIENT_ID: ${env:DISCORD_CLIENT_ID}
+      DISCORD_CLIENT_SECRET: ${env:DISCORD_CLIENT_SECRET}
+      BASE_URL: ${env:BASE_URL}
+      DISCORD_BOT_TOKEN: ${env:DISCORD_BOT_TOKEN}
+      DISCORD_GUILD_ID: ${env:DISCORD_GUILD_ID}
+      DISCORD_ROLE_ID: ${env:DISCORD_ROLE_ID}
+    events:
+      - http:
+          method: ANY
+          path: "/"
+          cors: true
+      - http:
+          method: ANY
+          path: "/{any+}"
+          cors: true
+plugins:
+  - serverless-esbuild
+  - serverless-offline
